@@ -6,10 +6,7 @@ from sklearn.preprocessing import StandardScaler
 df = pd.read_csv('../data/output.csv') 
 X = df.values.astype(float)
 
-scaler = StandardScaler()
-X = scaler.fit_transform(X)
-
-W_est = notears_linear(X, lambda1=0.05, loss_type='logistic', max_iter=1000)
+W_est = notears_linear(X, lambda1=0.075, loss_type='logistic', max_iter=1000)
 print("Estimated adjacency matrix:")
 print(W_est)
 
