@@ -11,8 +11,15 @@ data = sampler.forward_sample(size=100000)
 
 for col in data.columns:
     unique_values = data[col].unique()
+    if unique_values[0] in ["high", "low"]:
+        mapping = {"low": 0, "high": 1}
+    elif unique_values[0] in ["True", "False"]:
+        mapping = {"False": 0, "True": 1}
+    elif unique_values[0] in ["positive", "negative"]:
+        mapping = {"negative": 0, "positive": 1}
+    else:
+        raise Exception("unable to handle column")
     if len(unique_values) == 2:
-        mapping = {unique_values[0]: 0, unique_values[1]: 1}
         data[col] = data[col].map(mapping)
 
 data.to_csv("output.csv", index=False)

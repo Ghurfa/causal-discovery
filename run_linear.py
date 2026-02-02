@@ -3,7 +3,7 @@ import numpy as np
 from linear_test import notears_linear
 from sklearn.preprocessing import StandardScaler
 
-df = pd.read_csv('../data/output.csv') 
+df = pd.read_csv('./output.csv') 
 X = df.values.astype(float)
 
 W_est = notears_linear(X, lambda1=0.075, loss_type='logistic', max_iter=1000)
