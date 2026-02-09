@@ -163,9 +163,10 @@ def squared_loss(output, target):
     return loss
 
 
-def dual_ascent_step(model, X, lambda1, lambda2, rho, alpha, h, rho_max):
+def dual_ascent_step(model, X, lambda1, lambda2, rho, alpha, h, rho_max, record_loss=False):
     """Perform one step of dual ascent in augmented Lagrangian."""
     h_new = None
+    inner_losses = [] if record_loss else None
     optimizer = LBFGSBScipy(model.parameters())
     X_torch = torch.from_numpy(X)
     while rho < rho_max:
@@ -179,6 +180,8 @@ def dual_ascent_step(model, X, lambda1, lambda2, rho, alpha, h, rho_max):
             l1_reg = lambda1 * model.fc1_l1_reg()
             primal_obj = loss + penalty + l2_reg + l1_reg
             primal_obj.backward()
+            if record_loss:
+                inner_losses.append(loss.item())
             return primal_obj
         optimizer.step(closure)  # NOTE: updates model in-place
         with torch.no_grad():
@@ -188,6 +191,8 @@ def dual_ascent_step(model, X, lambda1, lambda2, rho, alpha, h, rho_max):
         else:
             break
     alpha += rho * h_new
+    if record_loss:
+        return rho, alpha, h_new, inner_losses
     return rho, alpha, h_new
 
 
@@ -198,15 +203,32 @@ def notears_nonlinear(model: nn.Module,
                       max_iter: int = 100,
                       h_tol: float = 1e-8,
                       rho_max: float = 1e+16,
-                      w_threshold: float = 0.3):
+                      w_threshold: float = 0.3,
+                      record_loss: bool = False):
     rho, alpha, h = 1.0, 0.0, np.inf
+    if record_loss:
+        outer_loss = []
+        inner_loss_history = []
     for _ in range(max_iter):
-        rho, alpha, h = dual_ascent_step(model, X, lambda1, lambda2,
-                                         rho, alpha, h, rho_max)
+        if record_loss:
+            result = dual_ascent_step(model, X, lambda1, lambda2,
+                                      rho, alpha, h, rho_max, record_loss=True)
+            rho, alpha, h, inner_losses = result
+            inner_loss_history.append(inner_losses)
+            with torch.no_grad():
+                X_torch = torch.from_numpy(X)
+                X_hat = model(X_torch)
+                loss = squared_loss(X_hat, X_torch).item()
+                outer_loss.append(loss)
+        else:
+            rho, alpha, h = dual_ascent_step(model, X, lambda1, lambda2,
+                                             rho, alpha, h, rho_max, record_loss=False)
         if h <= h_tol or rho >= rho_max:
             break
     W_est = model.fc1_to_adj()
     W_est[np.abs(W_est) < w_threshold] = 0
+    if record_loss:
+        return W_est, outer_loss, inner_loss_history
     return W_est
 
 

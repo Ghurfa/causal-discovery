@@ -6,7 +6,7 @@ import scipy.optimize as sopt
 from scipy.special import expit as sigmoid
 
 
-def notears_linear(X, lambda1, loss_type, max_iter=100, h_tol=1e-8, rho_max=1e+16, w_threshold=0.3):
+def notears_linear(X, lambda1, loss_type, max_iter=100, h_tol=1e-8, rho_max=1e+16, w_threshold=0.3, record_loss=False):
     """Solve min_W L(W; X) + lambda1 ‖W‖_1 s.t. h(W) = 0 using augmented Lagrangian.
 
     Args:
@@ -69,10 +69,29 @@ def notears_linear(X, lambda1, loss_type, max_iter=100, h_tol=1e-8, rho_max=1e+1
     bnds = [(0, 0) if i == j else (0, None) for _ in range(2) for i in range(d) for j in range(d)]
     if loss_type == 'l2':
         X = X - np.mean(X, axis=0, keepdims=True)
+
+    # history containers
+    if record_loss:
+        loss_history = []  # outer-epoch loss
+        inner_loss_history = []  # list of lists for inner optimizer iterations per outer epoch
+
     for _ in range(max_iter):
         w_new, h_new = None, None
+        if record_loss:
+            inner_loss = []
+
+        def _callback(wk):
+            if record_loss:
+                Wk = _adj(wk)
+                lv, _ = _loss(Wk)
+                inner_loss.append(lv)
+
         while rho < rho_max:
-            sol = sopt.minimize(_func, w_est, method='L-BFGS-B', jac=True, bounds=bnds)
+            if record_loss:
+                sol = sopt.minimize(_func, w_est, method='L-BFGS-B', jac=True, bounds=bnds, callback=_callback)
+                inner_loss_history.append(inner_loss.copy())
+            else:
+                sol = sopt.minimize(_func, w_est, method='L-BFGS-B', jac=True, bounds=bnds)
             w_new = sol.x
             h_new, _ = _h(_adj(w_new))
             if h_new > 0.25 * h:
@@ -81,10 +100,16 @@ def notears_linear(X, lambda1, loss_type, max_iter=100, h_tol=1e-8, rho_max=1e+1
                 break
         w_est, h = w_new, h_new
         alpha += rho * h
+        if record_loss:
+            W_current = _adj(w_est)
+            loss_val, _ = _loss(W_current)
+            loss_history.append(loss_val)
         if h <= h_tol or rho >= rho_max:
             break
     W_est = _adj(w_est)
     W_est[np.abs(W_est) < w_threshold] = 0
+    if record_loss:
+        return W_est, loss_history, inner_loss_history
     return W_est
 
 
