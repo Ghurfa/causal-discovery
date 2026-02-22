@@ -10,21 +10,21 @@ torch.set_default_dtype(torch.double)
 # Load your data
 df = pd.read_csv('../data/output.csv')
 X = df.values.astype(float)
-d = X.shape[1]
-
+X_scaled = (X - X.mean(axis=0)) / X.std(axis=0)
+d = X_scaled.shape[1]
 # Convert to torch double tensor
 X_torch = torch.from_numpy(X).double()
 
 # Instantiate the MLP model
-model = NotearsMLP(dims=[d, 20, 10, 1], bias=True)
+model = NotearsMLP(dims=[d, 64, 32, 1], bias=True)
 
 res = notears_nonlinear(
     model,
-    X,
-    lambda1=1e-5,
-    lambda2=.01,
-    max_iter=500,
-    w_threshold=1e-6,
+    X_scaled,
+    lambda1=0.01,
+    lambda2=1e-4,
+    max_iter=1000,
+    w_threshold=.1,
     record_loss=True
 )
 
@@ -83,3 +83,28 @@ if inner_loss_history is not None:
         in_path = os.path.join(script_dir, 'loss_inner_nonlinear.png')
         plt.savefig(in_path)
         print(f"Saved inner loss plot to: {in_path}")
+
+dag_pred = (W_est != 0).astype(int)
+
+import sys
+sys.path.append('../DAGPA')
+
+from eval import f1, f1_skeleton, shd, shd_skeleton, ci_mcc
+print("\nEvaluation vs Ground Truth (Sachs):")
+
+dag_sachs_truth = np.array([
+[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0],
+[1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0],
+[0.0,0.0,1.0,1.0,1.0,0.0,0.0,1.0,0.0,0.0,1.0],
+[0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+], dtype=int)
+
+print("SHD (directed):       ", shd(dag_pred, dag_sachs_truth))
+print("CI-MCC:              ", ci_mcc(dag_pred, true_dag=dag_sachs_truth))

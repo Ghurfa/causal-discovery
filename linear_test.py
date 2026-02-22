@@ -83,8 +83,12 @@ def notears_linear(X, lambda1, loss_type, max_iter=100, h_tol=1e-8, rho_max=1e+1
         def _callback(wk):
             if record_loss:
                 Wk = _adj(wk)
-                lv, _ = _loss(Wk)
-                inner_loss.append(lv)
+                loss_val, _ = _loss(Wk)
+                h_val, _ = _h(Wk)
+                l1_val = lambda1 * wk.sum()
+                penalty_val = 0.5 * rho * h_val * h_val + alpha * h_val
+                total_obj = loss_val + l1_val + penalty_val
+                inner_loss.append(total_obj)
 
         while rho < rho_max:
             if record_loss:

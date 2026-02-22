@@ -15,19 +15,19 @@ X_scaled = (X - X.mean(axis=0)) / X.std(axis=0)
 
 res = notears_linear(
     X_scaled,
-    lambda1=0.001,
-    loss_type='logistic',
+    lambda1=0.01,
+    loss_type='l2',
     max_iter=1000,
-    w_threshold=0.05,
+    w_threshold=0.1, 
     record_loss=True
 )
-
 if isinstance(res, (tuple, list)):
     W_est, outer_loss, inner_loss_history = res
 else:
     W_est = res
     outer_loss, inner_loss_history = None, None
 
+np.fill_diagonal(W_est, 0)
 
 # Print weighted adjacency
 print("Estimated adjacency matrix:")
@@ -74,3 +74,30 @@ if inner_loss_history is not None:
         in_path = os.path.join(script_dir, 'loss_inner.png')
         plt.savefig(in_path)
         print(f"Saved inner loss plot to: {in_path}")
+
+
+dag_pred = (W_est != 0).astype(int)
+
+import sys
+sys.path.append('../DAGPA')
+
+from eval import f1, f1_skeleton, shd, shd_skeleton, ci_mcc
+print("\nEvaluation vs Ground Truth (Sachs):")
+
+dag_sachs_truth = np.array([
+[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0],
+[1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0],
+[0.0,0.0,1.0,1.0,1.0,0.0,0.0,1.0,0.0,0.0,1.0],
+[0.0,0.0,0.0,0.0,0.0,1.0,1.0,0.0,0.0,0.0,0.0],
+[0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],
+], dtype=int)
+
+
+print("SHD (directed):       ", shd(dag_pred, dag_sachs_truth))
+print("CI-MCC:              ", ci_mcc(dag_pred, true_dag=dag_sachs_truth))
