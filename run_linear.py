@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import networkx as nx
 import os
 from linear_test import notears_linear
 
@@ -42,8 +43,47 @@ if len(edges) > 0:
 else:
     print("  No significant edges found")
 
-# Plot outer loss history
+# Create and visualize graph using networkx
+G = nx.DiGraph()
+node_names = df.columns.tolist()
+G.add_nodes_from(node_names)
+
+if len(edges) > 0:
+    for i, j in edges:
+        weight = W_est[i, j]
+        source = df.columns[i]
+        target = df.columns[j]
+        G.add_edge(source, target, weight=weight)
+
+print(f"\nGraph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
+
+# Visualize the graph
 script_dir = os.path.dirname(__file__)
+if G.number_of_edges() > 0:
+    plt.figure(figsize=(12, 10))
+    pos = nx.spring_layout(G, k=0.8, iterations=50, seed=42)
+    nx.draw_networkx_nodes(G, pos, node_color='lightblue', node_size=1500)
+    nx.draw_networkx_labels(G, pos, font_size=10, font_weight='bold')
+    nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, 
+                          arrowsize=40, arrowstyle='->', width=2.5,
+                          min_source_margin=25, min_target_margin=25)
+    
+    # Draw edge labels with weights
+    edge_labels = {(u, v): f"{d['weight']:.3f}" for u, v, d in G.edges(data=True)}
+    nx.draw_networkx_edge_labels(G, pos, edge_labels, font_size=9)
+    
+    plt.title('Causal Discovery Graph (NOTEARs Linear)', fontsize=14, fontweight='bold')
+    plt.axis('off')
+    plt.tight_layout()
+    graph_path = os.path.join(script_dir, 'causal_graph_linear.png')
+    plt.savefig(graph_path, dpi=150, bbox_inches='tight')
+    print(f"Saved causal graph to: {graph_path}")
+    plt.close()
+else:
+    print("No edges to visualize")
+
+
+# Plot outer loss history
 if outer_loss is not None:
     plt.figure()
     plt.plot(range(1, len(outer_loss) + 1), outer_loss, marker='o')
